@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flutter WebView Example</title>
+    <script src="dist/bundle.js"></script>
+</head>
+<body>
+<h1 onclick="handleDownloadWord({ template_file: 'template.docx', doc_name: 'example' })">Hello, Flutter WebView</h1>
+</body>
+<script>
+    
+    async function handleDownloadWord(selectedDocument) {
+        const uploadedFileName = selectedDocument.template_file;
+        const doc_name = selectedDocument.doc_name;
+        const backendUrl = `https://uatapi.dealdox.io/api/doctype/download?url=${encodeURIComponent(
+          selectedDocument.template_file
+        )}`; // replace with your backend URL
+
+        try {
+            const response = await fetch(backendUrl);
+            if (!response.ok) {
+                console.error(`Failed to download ${uploadedFileName}: ${response.status}`);
+                return;
+            }
+            const blob = await response.blob();
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const arrayBuffer = reader.result;
+                const htmlModule = new DocxtemplaterHtmlModule({
+                    ignoreUnknownTags: true,
+                    ignoreCssErrors: true,
+                });
+                htmlModule.prefix = "~";
+                htmlModule.blockPrefix = "";
+
+                var zip = new PizZip(arrayBuffer);
+                var doc = new Docxtemplater(zip, {
+                    paragraphLoop: true,
+                    linebreaks: true,
+                    delimiters: { start: "$", end: "$" },
+                    modules: [htmlModule],
+                });
+                const sectionData = {}; // Populate with your data
+                doc.setData(sectionData);
+                try {
+                    doc.render();
+                } catch (error) {
+                    console.error("Error rendering document:", error);
+                    return;
+                }
+
+                var out = doc.getZip().generate({
+                    type: "blob",
+                    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                });
+                saveAs(out, `${doc_name}.latest.docx`);
+            };
+            reader.readAsArrayBuffer(blob);
+        } catch (error) {
+            console.error("Error downloading document:", error);
+        }
+    }
+</script>
+</html>
